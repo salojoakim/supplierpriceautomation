@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+
+# Local data & outputs
+data/
+logs/
+*.eml
+
+# Editors/OS
+.vscode/
+.idea/
+.DS_Store
+
+# Environment
+.env

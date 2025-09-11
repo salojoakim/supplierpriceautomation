@@ -1,0 +1,20 @@
+# Core
+python-dotenv>=1.0.0
+
+# Email + attachments parsing
+mail-parser>=3.15.0
+pandas>=2.1.0
+openpyxl>=3.1.2
+pdfplumber>=0.11.0
+python-docx>=1.0.0
+
+# LLM (Gemini)
+google-generativeai>=0.5.0
+
+# Microsoft Graph (shared mailbox fetch)
+msal>=1.28.0
+requests>=2.31.0
+
+# Utilities (optional but handy)
+tqdm>=4.66.0
+chardet>=5.2.0
