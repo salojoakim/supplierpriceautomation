@@ -40,3 +40,58 @@ Automated pipeline that ingests **provider emails** about SMS pricing (both **em
 ---
 
 ## Architecture
+[Email (.EML or Shared Mailbox)]
+│
+│ (optional) Microsoft Graph → .eml in data/inbox_today/
+▼
+[Parsers] Body → LLM | Attachments → (CSV/Excel deterministic, PDF/DOCX via LLM)
+▼
+[Normalized rows]
+▼
+[Snapshot (JSON)] + [Diff vs. previous]
+▼
+[HTML report via SMTP] (or saved in logs/outbox if DRY_RUN)
+
+
+## Project Structure
+sms_price/
+app.py # main pipeline
+requirements.txt
+.env.example # template (no secrets)
+utils/
+email_reader.py # read .eml (body + attachments)
+attachment_parser.py # CSV/Excel/PDF/DOCX handling
+mailer.py # send or save HTML report
+graph_mail.py # Microsoft Graph (shared mailbox) fetch
+llm/
+extractor.py # Gemini + mock-mode
+prompt_templates.py # LLM prompt
+data/ # local emails & archive (git-ignored)
+logs/ # snapshots & outbox (git-ignored)
+
+
+
+> `.gitignore` excludes: `.venv/`, `data/`, `logs/`, `.env`, editor folders, etc. Keep `.gitkeep` files in `data/` and `logs/` so folders exist in the repo.
+
+---
+
+## Prerequisites
+- **Python 3.10+**
+- Gemini **API key** if running real LLM (not needed in mock mode)
+- An SMTP account to send the daily report (skip when `DRY_RUN=true`)
+- (Optional) Azure App with **Microsoft Graph** if reading a shared mailbox
+
+---
+
+## Install
+
+```bash
+# Create & activate a venv (Windows PowerShell)
+python -m venv .venv
+. .\.venv\Scripts\Activate.ps1
+
+# macOS/Linux
+# python -m venv .venv
+# source .venv/bin/activate
+
+pip install -r requirements.txt
