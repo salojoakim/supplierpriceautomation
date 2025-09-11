@@ -1,7 +1,5 @@
 # supplierpriceautomation
 
-# sms_price
-
 Automated pipeline that ingests **provider emails** about SMS pricing (both **email body** and **attachments**), extracts and normalizes price rows, stores a **daily snapshot**, diffs against the **previous snapshot**, and sends a **daily HTML summary**.
 
 - **Sources:** local `.eml` files or a Microsoft 365 **shared mailbox** via **Microsoft Graph**
@@ -40,58 +38,159 @@ Automated pipeline that ingests **provider emails** about SMS pricing (both **em
 ---
 
 ## Architecture
-[Email (.EML or Shared Mailbox)]
-│
-│ (optional) Microsoft Graph → .eml in data/inbox_today/
-▼
-[Parsers] Body → LLM | Attachments → (CSV/Excel deterministic, PDF/DOCX via LLM)
-▼
-[Normalized rows]
-▼
-[Snapshot (JSON)] + [Diff vs. previous]
-▼
-[HTML report via SMTP] (or saved in logs/outbox if DRY_RUN)
+    [Email (.EML or Shared Mailbox)]
+       |
+       |-- (optional) Microsoft Graph --> .eml in data/inbox_today/
+       v
+    [Parsers]  Body -> LLM  |  Attachments -> (CSV/Excel deterministic, PDF/DOCX via LLM)
+       v
+    [Normalized rows]
+       v
+    [Snapshot (JSON)]  +  [Diff vs previous]
+       v
+    [HTML report via SMTP]  (or saved in logs/outbox if DRY_RUN)
 
+---
 
 ## Project Structure
-sms_price/
-app.py # main pipeline
-requirements.txt
-.env.example # template (no secrets)
-utils/
-email_reader.py # read .eml (body + attachments)
-attachment_parser.py # CSV/Excel/PDF/DOCX handling
-mailer.py # send or save HTML report
-graph_mail.py # Microsoft Graph (shared mailbox) fetch
-llm/
-extractor.py # Gemini + mock-mode
-prompt_templates.py # LLM prompt
-data/ # local emails & archive (git-ignored)
-logs/ # snapshots & outbox (git-ignored)
+    supplierpriceautomation/
+    ├─ app.py
+    ├─ requirements.txt
+    ├─ README.md
+    ├─ .env.example
+    ├─ utils/
+    │  ├─ email_reader.py        # read .eml (body + attachments)
+    │  ├─ attachment_parser.py   # CSV/Excel/PDF/DOCX handling
+    │  ├─ mailer.py              # send or save HTML report
+    │  └─ graph_mail.py          # Microsoft Graph (shared mailbox) fetch
+    ├─ llm/
+    │  ├─ extractor.py           # Gemini + mock-mode
+    │  └─ prompt_templates.py    # LLM prompt
+    ├─ tests/                    # optional tests
+    ├─ data/                     # local emails & archive (git-ignored)
+    └─ logs/                     # snapshots & outbox (git-ignored)
 
-
-
-> `.gitignore` excludes: `.venv/`, `data/`, `logs/`, `.env`, editor folders, etc. Keep `.gitkeep` files in `data/` and `logs/` so folders exist in the repo.
+> `.gitignore` excludes: `.venv/`, `data/`, `logs/`, `.env`, editor folders, etc.  
+> Keep `.gitkeep` files in `data/` and `logs/` so folders remain in the repo.
 
 ---
 
 ## Prerequisites
 - **Python 3.10+**
 - Gemini **API key** if running real LLM (not needed in mock mode)
-- An SMTP account to send the daily report (skip when `DRY_RUN=true`)
-- (Optional) Azure App with **Microsoft Graph** if reading a shared mailbox
+- SMTP account for the daily report (skip when `DRY_RUN=true`)
+- (Optional) Azure App with **Microsoft Graph** (Application permission **Mail.Read**) if reading a shared mailbox
 
 ---
 
 ## Install
+    # Windows (CMD)
+    py -m venv .venv
+    .\.venv\Scripts\activate.bat
+    pip install -U pip
+    pip install -r requirements.txt
 
-```bash
-# Create & activate a venv (Windows PowerShell)
-python -m venv .venv
-. .\.venv\Scripts\Activate.ps1
+    # macOS/Linux
+    # python -m venv .venv
+    # source .venv/bin/activate
+    # pip install -U pip
+    # pip install -r requirements.txt
 
-# macOS/Linux
-# python -m venv .venv
-# source .venv/bin/activate
+---
 
-pip install -r requirements.txt
+## Configuration (.env)
+Copy `.env.example` → `.env` and fill in values (never commit `.env`):
+
+    # Modes
+    USE_GRAPH=false
+    MOCK_LLM=true
+    DRY_RUN=true
+
+    # Microsoft Graph (only if USE_GRAPH=true)
+    MS_TENANT_ID=
+    MS_CLIENT_ID=
+    MS_CLIENT_SECRET=
+    MS_SHARED_MAILBOX=
+    MS_MAIL_FOLDER=Inbox
+    MS_DAYS_BACK=1
+    MS_TOP=100
+
+    # Gemini (only if MOCK_LLM=false)
+    GOOGLE_API_KEY=
+
+    # SMTP (only if DRY_RUN=false)
+    SMTP_HOST=
+    SMTP_PORT=587
+    SMTP_USER=
+    SMTP_PASSWORD=
+    SMTP_FROM=
+    SMTP_TO=
+    SMTP_STARTTLS=true
+
+Tips:
+- Put secrets in quotes if they contain special characters.
+- Don’t add inline comments on the same line as values.
+
+---
+
+## Quick Start – Simulation (no cloud needed)
+1) Put a few `.eml` files in `data/email_memory/`  
+   (Outlook → Save As → file type **.eml**)
+2) In `.env`:
+    - `USE_GRAPH=false`
+    - `MOCK_LLM=true`
+    - `DRY_RUN=true`
+3) Run:
+    - `python app.py`
+4) Open the HTML report in `logs/outbox/summary_*.html`.
+
+---
+
+## Production
+1) **Real LLM:** set `MOCK_LLM=false` and add `GOOGLE_API_KEY`.  
+2) **Send emails:** set `DRY_RUN=false` and fill SMTP settings.  
+3) **Shared mailbox (Graph):**
+   - Install `msal` + `requests`
+   - Azure App with **Mail.Read (Application)** + admin consent
+   - Fill MS_* values and set `USE_GRAPH=true`
+
+Run:
+    python app.py
+
+---
+
+## Schedule a Daily Run
+**Windows Task Scheduler**
+    @echo off
+    cd /d C:\path\to\supplierpriceautomation
+    call .venv\Scripts\activate
+    python app.py
+
+**Linux/macOS (cron)**
+    0 7 * * * /path/to/.venv/bin/python /path/to/supplierpriceautomation/app.py >> /path/to/logs/cron.log 2>&1
+
+---
+
+## Testing
+    pip install pytest
+    pytest -q
+
+---
+
+## Troubleshooting
+- `ModuleNotFoundError: msal` → install `msal` or set `USE_GRAPH=false`.  
+- No email sent → ensure `DRY_RUN=false` and SMTP values are correct (in `DRY_RUN=true` the HTML is saved to `logs/outbox`).  
+- PDF/DOCX not parsed → mock mode is simplified; use `MOCK_LLM=false` for LLM parsing.  
+- Excel/CSV columns differ → extend `attachment_parser.py` or let LLM handle tricky layouts.
+
+---
+
+## Security
+- `.env` is git-ignored; never commit secrets.
+- Limit Azure app to **Mail.Read (Application)**.
+- Handle snapshots/logs per company policy (may include pricing data).
+
+---
+
+## License
+MIT (or your preferred license)
