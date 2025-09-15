@@ -54,9 +54,9 @@ Automated pipeline that ingests **provider emails** about SMS pricing (both **em
 
 ---
 
-## Project Structure
-```text
-supplierpriceautomation/
+<h2>Project Structure</h2>
+
+<pre><code>supplierpriceautomation/
 ├─ app.py
 ├─ requirements.txt
 ├─ README.md
@@ -73,11 +73,11 @@ supplierpriceautomation/
 ├─ tests/                    # optional tests
 ├─ data/                     # local emails & archive (git-ignored)
 └─ logs/                     # snapshots & outbox (git-ignored)
+</code></pre>
 
+<p><em>.gitignore</em> excludes: <code>.venv/</code>, <code>data/</code>, <code>logs/</code>, <code>.env</code>, editor folders, etc.<br>
+Keep <code>.gitkeep</code> files in <code>data/</code> and <code>logs/</code> so folders remain in the repo.</p>
 
-
-> `.gitignore` excludes: `.venv/`, `data/`, `logs/`, `.env`, editor folders, etc.  
-> Keep `.gitkeep` files in `data/` and `logs/` so folders remain in the repo.
 
 
 ---
