@@ -34,6 +34,8 @@ Automated pipeline that ingests **provider emails** about SMS pricing (both **em
 - Store daily **snapshots** (`logs/parsed_YYYY-MM-DD.json` + `logs/latest.json`).
 - Diff vs. previous snapshot: **Changed / New / Removed**.
 - Email a **rich HTML report** (or save the HTML when `DRY_RUN=true`).
+- [Snapshot (JSON)]  +  [Diff vs previous]  ← via utils/price_analyzer.py
+
 
 ---
 
@@ -53,25 +55,28 @@ Automated pipeline that ingests **provider emails** about SMS pricing (both **em
 ---
 
 ## Project Structure
-    supplierpriceautomation/
-    ├─ app.py
-    ├─ requirements.txt
-    ├─ README.md
-    ├─ .env.example
-    ├─ utils/
-    │  ├─ email_reader.py        # read .eml (body + attachments)
-    │  ├─ attachment_parser.py   # CSV/Excel/PDF/DOCX handling
-    │  ├─ mailer.py              # send or save HTML report
-    │  └─ graph_mail.py          # Microsoft Graph (shared mailbox) fetch
-    ├─ llm/
-    │  ├─ extractor.py           # Gemini + mock-mode
-    │  └─ prompt_templates.py    # LLM prompt
-    ├─ tests/                    # optional tests
-    ├─ data/                     # local emails & archive (git-ignored)
-    └─ logs/                     # snapshots & outbox (git-ignored)
+supplierpriceautomation/
+├─ app.py
+├─ requirements.txt
+├─ README.md
+├─ .env.example
+├─ utils/
+│  ├─ email_reader.py        # read .eml (body + attachments)
+│  ├─ attachment_parser.py   # CSV/Excel/PDF/DOCX handling
+│  ├─ mailer.py              # send or save HTML report
+│  ├─ graph_mail.py          # Microsoft Graph (shared mailbox) fetch
+│  └─ price_analyzer.py      # snapshots + diff (Changed/New/Removed)
+├─ llm/
+│  ├─ extractor.py           # Gemini + mock-mode
+│  └─ prompt_templates.py    # LLM prompt
+├─ tests/                    # optional tests
+├─ data/                     # local emails & archive (git-ignored)
+└─ logs/                     # snapshots & outbox (git-ignored)
+
 
 > `.gitignore` excludes: `.venv/`, `data/`, `logs/`, `.env`, editor folders, etc.  
 > Keep `.gitkeep` files in `data/` and `logs/` so folders remain in the repo.
+
 
 ---
 
