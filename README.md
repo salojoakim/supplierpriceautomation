@@ -55,6 +55,7 @@ Automated pipeline that ingests **provider emails** about SMS pricing (both **em
 ---
 
 ## Project Structure
+```text
 supplierpriceautomation/
 ├─ app.py
 ├─ requirements.txt
@@ -72,6 +73,7 @@ supplierpriceautomation/
 ├─ tests/                    # optional tests
 ├─ data/                     # local emails & archive (git-ignored)
 └─ logs/                     # snapshots & outbox (git-ignored)
+
 
 
 > `.gitignore` excludes: `.venv/`, `data/`, `logs/`, `.env`, editor folders, etc.  
