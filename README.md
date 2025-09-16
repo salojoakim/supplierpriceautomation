@@ -200,7 +200,6 @@ Run:
 ---
 
 ## License
-MIT License
 
 Copyright (c) [2025] [Joakim Salomonsson]
 
