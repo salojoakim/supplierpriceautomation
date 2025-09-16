@@ -1,3 +1,25 @@
+"""
+Prompt templates for the LLM (Gemini) used by llm/extractor.py.
+
+What’s here:
+- PRICE_EXTRACTION_PROMPT: A single, strict instruction for the model to return
+  ONLY JSON (no prose), as an array of rows. We encourage consistent keys like:
+  country, operator/network, mcc, mnc, previous_rate/old_price, new_price/rate,
+  currency, effective_from, variation.
+
+How to tweak:
+- If a supplier consistently includes extra fields (e.g., number_type, destination),
+  add them to the prompt and to your downstream normalization (if needed).
+- Keep examples minimal but precise. More structure in the prompt → cleaner output.
+- If you see the model wrapping JSON in markdown ``` fences, that’s fine:
+  extractor.py already strips those.
+
+Safety:
+- Do NOT put secrets in prompts.
+- Keep the prompt deterministic: ask for JSON only and null for missing fields.
+"""
+
+
 PRICE_EXTRACTION_PROMPT = """
 Du är en assistent som analyserar prisuppdateringar från SMS-leverantörer
 och extraherar *strukturerad* data från e-post (tabeller eller löptext).
