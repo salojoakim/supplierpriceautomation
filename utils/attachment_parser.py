@@ -1,3 +1,19 @@
+"""
+Parse attachments and normalize them into pricing rows (or text blocks for the LLM).
+
+Supports:
+- Excel/CSV → read with pandas/openpyxl and map common columns to a standard schema
+- PDF/DOCX → extract text; return as "texts" for the LLM to interpret
+
+Output contract:
+- For spreadsheet-like inputs: normalized rows (dicts) ready for diff/snapshot.
+- For PDF/DOCX: raw text blocks (strings) that llm/extractor.py can process.
+
+Tip: If a new supplier has unusual column names, extend the column mapping here
+instead of hacking the rest of the pipeline.
+"""
+
+
 import re
 from io import BytesIO
 from typing import List, Dict, Any
