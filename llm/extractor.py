@@ -1,3 +1,39 @@
+"""
+LLM-based extraction of SMS pricing rows from free text (email body or text
+extracted from PDF/DOCX). Two modes:
+
+- MOCK_LLM=true  → uses a lightweight, rule-based extractor (fast and free).
+- MOCK_LLM=false → uses Google Gemini (google-generativeai) with the prompt
+                   defined in llm/prompt_templates.py.
+
+Env:
+- GOOGLE_API_KEY (required when MOCK_LLM=false)
+- MOCK_LLM (true/false)
+
+Input:
+- A plain-text string (email body or text block).
+- Optional provider_hint (e.g., supplier or filename) to help the model.
+
+Output:
+- List[dict] of normalized rows, e.g.:
+  {
+    "country": "Sweden",
+    "network": "Telia",
+    "operator": "Telia",
+    "mcc": "240",
+    "mnc": "1",
+    "new_price": 0.055,  # or "rate"/"price" depending on source
+    "currency": "EUR",
+    "effective_from": "2025-09-08",
+    "variation": "increase" | "decrease" | "unchanged" | "new" | None
+  }
+
+Notes:
+- The function is tolerant to number formats (comma/period, currency symbols).
+- If the model returns markdown with ```json blocks, we strip and parse the JSON.
+- Errors fall back to returning [] so the pipeline never crashes on one bad email.
+"""
+
 import os
 import re
 import json
