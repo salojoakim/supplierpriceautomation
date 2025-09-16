@@ -1,3 +1,25 @@
+"""
+Main pipeline.
+
+What it does:
+- Reads .eml from EMAIL_DIR_DEFAULT or, if USE_GRAPH=true, fetches to INBOX_TODAY_DIR via Microsoft Graph.
+- For each email: body -> LLM; attachments -> attachment_parser; PDF/DOCX text -> LLM.
+- Builds today's normalized rows.
+- Saves snapshots to logs/parsed_YYYY-MM-DD.json and logs/latest.json.
+- Computes diff vs previous snapshot using helpers in THIS file:
+    find_previous_snapshot / load_snapshot / diff_snapshots
+- Renders an HTML summary (render_diff_html) and sends via utils.mailer.send_email.
+
+Run:
+    python app.py
+
+Notes:
+- Diff identity key is KEY_FIELDS.
+- Price selection via _pick_new_price/_pick_old_price.
+- Toggle Graph with USE_GRAPH in .env (MS_* required).
+"""
+
+
 import os
 import json
 import glob
