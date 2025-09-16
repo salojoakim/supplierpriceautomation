@@ -1,3 +1,14 @@
+"""
+Read .eml emails and return a clean, uniform structure for the pipeline:
+- metadata (subject, from, date)
+- plain body text (HTML is stripped to text)
+- raw attachments (filename, MIME type, bytes)
+
+Why: downstream code (LLM + attachment parser) should not worry about email internals.
+This module does NOT parse attachment content — it only exposes it for others to handle.
+"""
+
+
 from email.message import EmailMessage
 from utils.email_reader import load_eml_body
 
