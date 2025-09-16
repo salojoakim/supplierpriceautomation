@@ -1,3 +1,18 @@
+"""
+Fetch recent messages from a Microsoft 365 shared mailbox and save them as .eml files.
+
+Uses MSAL (client credentials) + Microsoft Graph:
+- Lists messages from a folder (e.g., Inbox) within a date window (e.g., last N days).
+- Downloads each message in MIME format to a local folder for the parser pipeline.
+
+Requires:
+- Azure App Registration with Graph Application permission "Mail.Read" and admin consent.
+- Tenant ID, Client ID, Client Secret, shared mailbox address.
+
+Keeps the core pipeline decoupled from Graph specifics.
+"""
+
+
 # utils/graph_mail.py
 import os
 import re
