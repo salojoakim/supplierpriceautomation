@@ -1,14 +1,17 @@
+"""
+Price snapshots + diff utilities.
+
+Purpose:
+- Load previous snapshot (logs/latest.json) if it exists.
+- Compare today's rows vs previous rows to detect:
+    Changed (price differs), New (not seen before), Removed (missing today).
+- Save today's snapshot (logs/parsed_YYYY-MM-DD.json) and update latest.json.
+
+The app may implement its own diff; if you keep a separate module, document these helpers clearly.
+"""
+
+
 # utils/price_analyzer.py
-"""
-Price snapshot & diff utilities.
-
-- load_previous_prices(path) -> list[dict]
-- save_current_prices(rows, path) -> writes JSON snapshot (+ updates latest.json)
-- compare_prices(current_rows, prev_rows) -> dict with Changed/New/Removed
-
-Vi försöker vara toleranta mot olika fältnamn från leverantörer.
-Unik rad-id sätts med en nyckel byggd på (country, network/operator, mcc, mnc, currency).
-"""
 
 from __future__ import annotations
 
