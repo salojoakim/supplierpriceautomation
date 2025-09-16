@@ -1,3 +1,18 @@
+"""
+Send the HTML summary via SMTP or save it locally in DRY_RUN mode.
+
+Modes:
+- DRY_RUN=true  → write HTML to logs/outbox/summary_*.html (no SMTP)
+- DRY_RUN=false → send email via SMTP (STARTTLS optional)
+
+Env (read by the app or this module):
+- SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, SMTP_TO, SMTP_STARTTLS
+- DRY_RUN
+
+This module focuses on a tiny "send or save" contract to keep the app logic simple.
+"""
+
+
 import os
 import smtplib
 from email.message import EmailMessage
