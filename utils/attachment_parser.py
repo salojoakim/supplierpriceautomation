@@ -8,9 +8,6 @@ Supports:
 Output contract:
 - For spreadsheet-like inputs: normalized rows (dicts) ready for diff/snapshot.
 - For PDF/DOCX: raw text blocks (strings) that llm/extractor.py can process.
-
-Tip: If a new supplier has unusual column names, extend the column mapping here
-instead of hacking the rest of the pipeline.
 """
 
 
