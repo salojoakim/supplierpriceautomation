@@ -6,8 +6,6 @@ Purpose:
 - Compare today's rows vs previous rows to detect:
     Changed (price differs), New (not seen before), Removed (missing today).
 - Save today's snapshot (logs/parsed_YYYY-MM-DD.json) and update latest.json.
-
-The app may implement its own diff; if you keep a separate module, document these helpers clearly.
 """
 
 
