@@ -1,36 +1,44 @@
 """
-Main pipeline.
+Main pipeline (now using utils.price_analyzer for snapshot + diff).
 
 What it does:
 - Reads .eml from EMAIL_DIR_DEFAULT or, if USE_GRAPH=true, fetches to INBOX_TODAY_DIR via Microsoft Graph.
 - For each email: body -> LLM; attachments -> attachment_parser; PDF/DOCX text -> LLM.
 - Builds today's normalized rows.
-- Saves snapshots to logs/parsed_YYYY-MM-DD.json and logs/latest.json.
-- Computes diff vs previous snapshot using helpers in THIS file:
-    find_previous_snapshot / load_snapshot / diff_snapshots
-- Renders an HTML summary (render_diff_html) and sends via utils.mailer.send_email.
+- Uses utils.price_analyzer to:
+    * load previous (logs/latest.json)
+    * compare current vs previous (changed/new/removed)
+    * save today's snapshot (logs/parsed_YYYY-MM-DD.json) and update latest.json
+- Adapts the diff shape to this file's render_diff_html() and sends the HTML via utils.mailer.
 
 Run:
     python app.py
 
 Notes:
-- Diff identity key is KEY_FIELDS.
-- Price selection via _pick_new_price/_pick_old_price.
+- We keep your render_diff_html() table format.
+- Unchanged pairs are not tracked by price_analyzer; we set unchanged_count=0.
 - Toggle Graph with USE_GRAPH in .env (MS_* required).
 """
 
-
 import os
 import json
-import glob
 from datetime import datetime, date
-from typing import List, Dict, Tuple
+from typing import List, Dict
+
+from html import escape
 
 from utils.email_reader import iter_eml_messages
 from utils.attachment_parser import parse_attachments
 from llm.extractor import extract_sms_prices_llm
 from utils.mailer import send_email
 from utils.graph_mail import fetch_shared_mailbox_to_folder
+
+# NEW: centralized snapshot + diff helpers
+from utils.price_analyzer import (
+    load_previous_prices,
+    save_current_prices,
+    compare_prices,
+)
 
 # ---------- Konfig ----------
 EMAIL_DIR_DEFAULT = "data/email_memory"
@@ -44,6 +52,11 @@ LATEST_PATH = os.path.join(LOG_DIR, "latest.json")
 
 # ---------- Extrahera ----------
 def process_dir(email_dir: str) -> List[Dict]:
+    """
+    Går igenom alla .eml i en katalog och extraherar normaliserade prisrader.
+    - Mailkropp -> LLM
+    - Bilagor: Excel/CSV -> rader direkt; PDF/DOCX -> textblock -> LLM
+    """
     rows: List[Dict] = []
     if not os.path.isdir(email_dir):
         print(f"❌ Hittar inte katalogen: {email_dir}")
@@ -71,94 +84,15 @@ def process_dir(email_dir: str) -> List[Dict]:
     return rows
 
 
-# ---------- Snapshot/Diff ----------
-def save_snapshot(rows: List[Dict], path: str):
-    os.makedirs(LOG_DIR, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(rows, f, indent=2, ensure_ascii=False)
-
-def load_snapshot(path: str) -> List[Dict]:
-    if not os.path.exists(path):
-        return []
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def find_previous_snapshot(exclude_today: bool = True) -> str | None:
-    candidates = sorted(glob.glob(os.path.join(LOG_DIR, "parsed_*.json")))
-    if not candidates:
-        return None
-    if not exclude_today:
-        return candidates[-1]
-    for p in reversed(candidates):
-        if not p.endswith(f"parsed_{TODAY}.json"):
-            return p
-    return None
-
-KEY_FIELDS = (
-    "provider", "country", "country_iso", "country_code",
-    "operator", "network", "mcc", "mnc", "number_type",
-    "destination", "currency",
-)
-
-def _key_of(rec: Dict) -> Tuple:
-    return tuple(rec.get(k) for k in KEY_FIELDS)
-
-def _pick_new_price(rec: Dict) -> float | None:
-    for k in ("new_price", "price", "current_rate"):
-        v = rec.get(k)
-        if isinstance(v, (int, float)):
-            return float(v)
-    return None
-
-def _pick_old_price(rec: Dict) -> float | None:
-    for k in ("previous_rate", "old_price"):
-        v = rec.get(k)
-        if isinstance(v, (int, float)):
-            return float(v)
-    return None
-
-def diff_snapshots(prev_rows: List[Dict], today_rows: List[Dict]) -> Dict[str, List[Dict]]:
-    prev_map = {_key_of(r): r for r in prev_rows}
-    today_map = {_key_of(r): r for r in today_rows}
-
-    changed, new, removed = [], [], []
-    unchanged = 0
-
-    for k, r_today in today_map.items():
-        r_prev = prev_map.get(k)
-        if r_prev is None:
-            p_today = _pick_new_price(r_today) or _pick_old_price(r_today)
-            new.append({"key": k, "today": r_today, "prev": None, "old": None, "new": p_today, "delta": None, "direction": "new"})
-            continue
-        p_prev = _pick_new_price(r_prev) or _pick_old_price(r_prev)
-        p_today = _pick_new_price(r_today) or _pick_old_price(r_today)
-        if p_prev is None and p_today is None:
-            unchanged += 1
-        elif p_prev is None and p_today is not None:
-            changed.append({"key": k, "today": r_today, "prev": r_prev, "old": None, "new": p_today, "delta": None, "direction": "new-value"})
-        elif p_prev is not None and p_today is None:
-            changed.append({"key": k, "today": r_today, "prev": r_prev, "old": p_prev, "new": None, "delta": None, "direction": "missing-today"})
-        else:
-            if abs(p_today - p_prev) > 1e-12:
-                delta = p_today - p_prev
-                direction = "increase" if delta > 0 else "decrease"
-                changed.append({"key": k, "today": r_today, "prev": r_prev, "old": p_prev, "new": p_today, "delta": delta, "direction": direction})
-            else:
-                unchanged += 1
-
-    for k, r_prev in prev_map.items():
-        if k not in today_map:
-            p_prev = _pick_new_price(r_prev) or _pick_old_price(r_prev)
-            removed.append({"key": k, "today": None, "prev": r_prev, "old": p_prev, "new": None, "delta": None, "direction": "removed"})
-
-    return {"changed": changed, "new": new, "removed": removed, "unchanged_count": unchanged}
-
-
 # ---------- Mailrender ----------
 def _fmt(v):
-    if v is None: return ""
-    if isinstance(v, float): return f"{v:.6f}"
-    return str(v)
+    if v is None:
+        return ""
+    if isinstance(v, float):
+        return f"{v:.6f}"
+    # escape to avoid accidental HTML injection from supplier text
+    return escape(str(v))
+
 
 def render_diff_html(diff: Dict[str, List[Dict]]) -> str:
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -255,20 +189,76 @@ def main():
         print("⚠️ Inget extraherat idag – avbryter mail.")
         return
 
-    # Spara snapshots
+    # --- Snapshot + diff using utils.price_analyzer ---
     os.makedirs(LOG_DIR, exist_ok=True)
-    with open(SNAPSHOT_PATH, "w", encoding="utf-8") as f:
-        json.dump(today_rows, f, indent=2, ensure_ascii=False)
-    with open(LATEST_PATH, "w", encoding="utf-8") as f:
-        json.dump(today_rows, f, indent=2, ensure_ascii=False)
 
-    # Diff mot tidigare
-    prev_path = find_previous_snapshot(exclude_today=True)
-    prev_rows = load_snapshot(prev_path) if prev_path else []
+    # 1) Load previous (latest.json if present)
+    prev_rows = load_previous_prices(LATEST_PATH)
 
-    diff = diff_snapshots(prev_rows, today_rows)
+    # 2) Compare current vs previous
+    diff_core = compare_prices(today_rows, prev_rows)
+    # diff_core = {"changed":[{"before":..,"after":..,"delta":..},...],
+    #              "new":[...], "removed":[...], "summary":{"changed":N,"new":M,"removed":K}}
+
+    # 3) Save today's snapshot (also updates logs/latest.json)
+    save_current_prices(today_rows, SNAPSHOT_PATH)
+
+    # --- Adapt diff to this file's render_diff_html() shape ---
+    def _price_any(rec):
+        if not isinstance(rec, dict):
+            return None
+        for k in ("new_price", "price", "rate", "current_rate", "previous_rate", "old_price"):
+            v = rec.get(k)
+            if isinstance(v, (int, float)):
+                return float(v)
+        return None
+
+    changed_adapted = []
+    for c in diff_core["changed"]:
+        before, after = c.get("before"), c.get("after")
+        old = _price_any(before)
+        newv = _price_any(after)
+        direction = "increase" if (old is not None and newv is not None and newv > old) else \
+                    "decrease" if (old is not None and newv is not None and newv < old) else "changed"
+        changed_adapted.append({
+            "key": None,
+            "today": after,
+            "prev": before,
+            "old": old,
+            "new": newv,
+            "delta": c.get("delta"),
+            "direction": direction,
+        })
+
+    new_adapted = [{
+        "key": None,
+        "today": n,
+        "prev": None,
+        "old": None,
+        "new": _price_any(n),
+        "delta": None,
+        "direction": "new",
+    } for n in diff_core["new"]]
+
+    removed_adapted = [{
+        "key": None,
+        "today": None,
+        "prev": r,
+        "old": _price_any(r),
+        "new": None,
+        "delta": None,
+        "direction": "removed",
+    } for r in diff_core["removed"]]
+
+    diff = {
+        "changed": changed_adapted,
+        "new": new_adapted,
+        "removed": removed_adapted,
+        "unchanged_count": 0,  # not tracked by price_analyzer; set to 0
+    }
+
+    # HTML + send
     html = render_diff_html(diff)
-
     subject = f"SMS Price Summary {TODAY} – Changed:{len(diff['changed'])} New:{len(diff['new'])} Removed:{len(diff['removed'])}"
     send_email(subject=subject, html_body=html)
     print("\n📤 Daglig summering skickad.")
