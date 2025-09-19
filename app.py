@@ -1,5 +1,5 @@
 """
-Main pipeline (now using utils.price_analyzer for snapshot + diff).
+Main pipeline
 
 What it does:
 - Reads .eml from EMAIL_DIR_DEFAULT or, if USE_GRAPH=true, fetches to INBOX_TODAY_DIR via Microsoft Graph.
